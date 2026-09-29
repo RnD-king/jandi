@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -22,6 +23,9 @@ public:
         std::unordered_map<int, int32_t> position_offsets;
         bool restore_offsets{false};
         std::vector<std::string> trailing_program_paths;
+        // 노드 시작 시 전체 WALK_MODE 모션을 재생하지 않고 마지막 자세로만 이동한다.
+        bool final_keyframe_only{false};
+        std::optional<double> duration_override_sec;
     };
 
     explicit P2PMotionPlayer(Dxl* dxl);
