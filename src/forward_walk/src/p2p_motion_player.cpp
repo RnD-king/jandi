@@ -111,6 +111,27 @@ void P2PMotionPlayer::ApplyStartOptions(
     const StartOptions& options,
     const std::filesystem::path& motion_directory)
 {
+    if (options.repeat_count == 0) {
+        throw std::runtime_error("repeat_count must be greater than zero");
+    }
+    if (options.duration_override_sec &&
+        *options.duration_override_sec <= 0.0) {
+        throw std::runtime_error(
+            "duration_override_sec must be greater than zero");
+    }
+
+    if (options.final_keyframe_only) {
+        if (motions_.empty() || motions_.back().keyframes.empty()) {
+            throw std::runtime_error(
+                "final keyframe requested from an empty program");
+        }
+        Motion final_pose;
+        final_pose.name = motions_.back().name + "_final_pose";
+        final_pose.keyframes.push_back(motions_.back().keyframes.back());
+        motions_.clear();
+        motions_.push_back(std::move(final_pose));
+    }
+
     const std::vector<Motion> original_motions = motions_;
     motions_.clear();
     for (std::size_t repeat = 0; repeat < options.repeat_count; ++repeat) {
@@ -164,6 +185,13 @@ void P2PMotionPlayer::ApplyStartOptions(
 
     for (const auto& trailing_path : options.trailing_program_paths) {
         AppendProgram(trailing_path, motion_directory);
+    }
+    if (options.duration_override_sec) {
+        for (auto& motion : motions_) {
+            for (auto& frame : motion.keyframes) {
+                frame.duration_sec = *options.duration_override_sec;
+            }
+        }
     }
     if (motions_.empty()) {
         throw std::runtime_error("program contains no motions after options");
