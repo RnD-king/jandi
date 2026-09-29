@@ -53,11 +53,14 @@ public:
             declare_parameter<int>("waist_yaw_direction", 1);
         waist_restore_after_shoot_ =
             declare_parameter<bool>("waist_restore_after_shoot", true);
+        startup_pose_duration_sec_ =
+            declare_parameter<double>("startup_pose_duration_sec", 3.0);
 
         if (turn_step_deg_ <= 0.0 || max_turn_repetitions_ <= 0 ||
             waist_max_yaw_deg_ <= 0.0 || waist_ticks_per_revolution_ <= 0.0 ||
+            startup_pose_duration_sec_ <= 0.0 ||
             (waist_yaw_direction_ != 1 && waist_yaw_direction_ != -1)) {
-            throw std::invalid_argument("invalid P2P yaw parameter");
+            throw std::invalid_argument("invalid P2P parameter");
         }
 
         // P2P는 JSON에 완성된 관절 raw tick이 있으므로 Trajectory/IK/Callback이
@@ -76,6 +79,23 @@ public:
         camera_status_pub_ = create_publisher<vision::msg::CommandStatus>(
             "/jandi_vision/camera_status", 10);
 
+        // JSON 보간과 전송을 callback에서 block하지 않고 100 Hz로 수행한다.
+        motion_loop_timer_ = create_wall_timer(
+            10ms, std::bind(&MainNode::MotionLoop, this));
+        motion_loop_timer_->cancel();
+
+        // WALK_MODE 마지막 자세에 도착하기 전에는 명령 topic을 구독하지 않는다.
+        StartStartupPose();
+    }
+
+private:
+    static constexpr int kLegJointCount = 12;
+    static constexpr double kTorquePerMilliAmp =
+        1.0 / (TORQUE_TO_VALUE_MX_106 * 3.36);
+    static constexpr const char* kTorqueLogDir = "/tmp/forward_walk_logs";
+
+    void CreateCommandSubscriptions()
+    {
         action_cmd_sub_ = create_subscription<vision::msg::ActionCommand>(
             "/jandi_vision/action_cmd", 10,
             std::bind(&MainNode::ActionCommandCallback, this,
@@ -84,21 +104,37 @@ public:
             "/jandi_vision/camera_cmd", 10,
             std::bind(&MainNode::CameraCommandCallback, this,
                       std::placeholders::_1));
-
-        // JSON 보간과 전송을 callback에서 block하지 않고 100 Hz로 수행한다.
-        motion_loop_timer_ = create_wall_timer(
-            10ms, std::bind(&MainNode::MotionLoop, this));
-        motion_loop_timer_->cancel();
-
-        RCLCPP_INFO(get_logger(), "P2P main node started. asset_dir=%s",
-                    asset_directory_.c_str());
+        RCLCPP_INFO(
+            get_logger(),
+            "Startup WALK_MODE pose reached and held; ready for command topics");
     }
 
-private:
-    static constexpr int kLegJointCount = 12;
-    static constexpr double kTorquePerMilliAmp =
-        1.0 / (TORQUE_TO_VALUE_MX_106 * 3.36);
-    static constexpr const char* kTorqueLogDir = "/tmp/forward_walk_logs";
+    void StartStartupPose()
+    {
+        const std::filesystem::path asset_root(asset_directory_);
+        const std::filesystem::path path =
+            asset_root /
+            ProgramFileForAction(vision::msg::ActionCommand::WALK_MODE);
+
+        P2PMotionPlayer::StartOptions options;
+        options.final_keyframe_only = true;
+        options.duration_override_sec = startup_pose_duration_sec_;
+        if (!p2p_player_->Start(path.string(),
+                                (asset_root / "motions").string(), options)) {
+            RCLCPP_FATAL(get_logger(),
+                         "Startup WALK_MODE pose failed; command topics will not be enabled: %s",
+                         p2p_player_->Error().c_str());
+            return;
+        }
+
+        startup_pose_in_progress_ = true;
+        current_action_ = vision::msg::ActionCommand::WALK_MODE;
+        motion_loop_timer_->reset();
+        RCLCPP_INFO(
+            get_logger(),
+            "Moving to final WALK_MODE pose over %.2f seconds before accepting commands",
+            startup_pose_duration_sec_);
+    }
 
     // 이 함수는 action의 의미와 실제 JSON 파일을 연결하는 유일한 표다.
     // action_id는 명령 인스턴스 ID이므로 절대 이 switch에 사용하지 않는다.
@@ -384,7 +420,7 @@ private:
 
     void MotionLoop()
     {
-        if (!motion_in_progress_) return;
+        if (!startup_pose_in_progress_ && !motion_in_progress_) return;
 
         // 기존 SelectMotion → Write_All_Theta → SetThetaRef 경로를 대체한다.
         // Update() 안에서 JSON 보간과 raw tick GroupSyncWrite가 한 번 수행된다.
@@ -394,14 +430,31 @@ private:
             return;
         }
         if (result == P2PMotionPlayer::UpdateResult::kError) {
-            RCLCPP_ERROR(get_logger(), "P2P playback failed: %s",
-                         p2p_player_->Error().c_str());
+            if (startup_pose_in_progress_) {
+                RCLCPP_FATAL(
+                    get_logger(),
+                    "Startup WALK_MODE pose failed; command topics will not be enabled: %s",
+                    p2p_player_->Error().c_str());
+            } else {
+                RCLCPP_ERROR(get_logger(), "P2P playback failed: %s",
+                             p2p_player_->Error().c_str());
+            }
+            startup_pose_in_progress_ = false;
             motion_in_progress_ = false;
+            current_action_ = 0;
             active_target_yaw_deg_ = 0;
             motion_loop_timer_->cancel();
             return;
         }
         if (result != P2PMotionPlayer::UpdateResult::kFinished) return;
+
+        if (startup_pose_in_progress_) {
+            startup_pose_in_progress_ = false;
+            current_action_ = 0;
+            motion_loop_timer_->cancel();
+            CreateCommandSubscriptions();
+            return;
+        }
 
         // JSON의 마지막 keyframe 이동과 hold까지 모두 끝난 시점에만 DONE을 보낸다.
         PublishActionStatus(active_action_id_, vision::msg::CommandStatus::DONE);
@@ -467,6 +520,8 @@ private:
     double waist_ticks_per_revolution_{4096.0};
     int waist_yaw_direction_{1};
     bool waist_restore_after_shoot_{true};
+    double startup_pose_duration_sec_{3.0};
+    bool startup_pose_in_progress_{false};   // 명령 수신 전 WALK_MODE 자세 이동 여부
     bool motion_in_progress_{false};          // 현재 P2P JSON 실행 여부
     std::uint64_t active_action_id_{0};       // 현재 실행 중인 transaction ID
     std::uint64_t last_completed_action_id_{0}; // DONE 재전송용 최근 완료 ID
