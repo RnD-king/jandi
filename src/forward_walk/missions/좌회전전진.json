@@ -1,0 +1,27 @@
+{
+  "name": "좌회전전진",
+  "motions": [
+    {
+      "filename": "보행_좌회전전진_20도_초기X.json",
+      "keyframe_count": 8,
+      "name": "보행_좌회전전진_20도_초기X",
+      "nominal_sec": 1.62,
+      "saved_at": "2026-09-21T20:44:15"
+    },
+    {
+      "filename": "보행_좌회전전진_20도_초기X.json",
+      "keyframe_count": 8,
+      "name": "보행_좌회전전진_20도_초기X",
+      "nominal_sec": 1.62,
+      "saved_at": "2026-09-21T20:44:15"
+    },
+    {
+      "filename": "보행_좌회전전진_20도_초기X.json",
+      "keyframe_count": 8,
+      "name": "보행_좌회전전진_20도_초기X",
+      "nominal_sec": 1.62,
+      "saved_at": "2026-09-21T20:44:15"
+    }
+  ],
+  "saved_at": "2026-09-21T20:44:35"
+}

@@ -1,0 +1,48 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.o
+*.so
+*.a
+
+# CUDA / compiler temporary files
+*.d
+*.obj
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Generated inference/model artifacts
+*.engine
+*.plan
+*.onnx
+*.wts
+*.pt
+
+# ROS recordings / camera recordings
+*.bag
+*.db3
+*.mcap
+*.mp4
+*.avi
+
+# Editor / local workspace
+.vscode/
+.idea/
+.codex/
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+*.bak

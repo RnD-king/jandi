@@ -1,0 +1,27 @@
+{
+  "name": "미세전진",
+  "motions": [
+    {
+      "filename": "미세보행_미세전진.json",
+      "keyframe_count": 5,
+      "name": "미세보행_미세전진",
+      "nominal_sec": 0.5,
+      "saved_at": "2026-09-19T00:06:44"
+    },
+    {
+      "filename": "미세보행_미세전진.json",
+      "keyframe_count": 5,
+      "name": "미세보행_미세전진",
+      "nominal_sec": 0.5,
+      "saved_at": "2026-09-19T00:06:44"
+    },
+    {
+      "filename": "미세보행_미세전진.json",
+      "keyframe_count": 5,
+      "name": "미세보행_미세전진",
+      "nominal_sec": 0.5,
+      "saved_at": "2026-09-19T00:06:44"
+    }
+  ],
+  "saved_at": "2026-09-21T22:10:47"
+}

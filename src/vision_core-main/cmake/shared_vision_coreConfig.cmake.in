@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/shared_vision_coreTargets.cmake")
+check_required_components(shared_vision_core)

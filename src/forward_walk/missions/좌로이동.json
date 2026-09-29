@@ -1,0 +1,27 @@
+{
+  "name": "좌로이동",
+  "motions": [
+    {
+      "filename": "죄로이동_최종_5cm.json",
+      "keyframe_count": 5,
+      "name": "죄로이동_최종_5cm",
+      "nominal_sec": 0.8999999999999999,
+      "saved_at": "2026-09-14T21:13:13"
+    },
+    {
+      "filename": "죄로이동_최종_5cm.json",
+      "keyframe_count": 5,
+      "name": "죄로이동_최종_5cm",
+      "nominal_sec": 0.8999999999999999,
+      "saved_at": "2026-09-14T21:13:13"
+    },
+    {
+      "filename": "죄로이동_최종_5cm.json",
+      "keyframe_count": 5,
+      "name": "죄로이동_최종_5cm",
+      "nominal_sec": 0.8999999999999999,
+      "saved_at": "2026-09-14T21:13:13"
+    }
+  ],
+  "saved_at": "2026-09-14T23:16:17"
+}

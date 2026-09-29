@@ -1,0 +1,34 @@
+{
+  "name": "4_걷기",
+  "motions": [
+    {
+      "filename": "4_1걸음_오른발만_연속_최종_초기X.json",
+      "keyframe_count": 2,
+      "name": "4_1걸음_오른발만_연속_최종_초기X",
+      "nominal_sec": 0.77,
+      "saved_at": "2026-09-04T21:57:49"
+    },
+    {
+      "filename": "4_1걸음_왼발만_연속_최종_초기X.json",
+      "keyframe_count": 2,
+      "name": "4_1걸음_왼발만_연속_최종_초기X",
+      "nominal_sec": 0.77,
+      "saved_at": "2026-09-04T21:57:27"
+    },
+    {
+      "filename": "4_1걸음_오른발만_연속_최종_초기X.json",
+      "keyframe_count": 2,
+      "name": "4_1걸음_오른발만_연속_최종_초기X",
+      "nominal_sec": 0.77,
+      "saved_at": "2026-09-04T21:57:49"
+    },
+    {
+      "filename": "4_1걸음_왼발만_연속_최종_초기X.json",
+      "keyframe_count": 2,
+      "name": "4_1걸음_왼발만_연속_최종_초기X",
+      "nominal_sec": 0.77,
+      "saved_at": "2026-09-04T21:57:27"
+    }
+  ],
+  "saved_at": "2026-09-04T21:58:14"
+}
