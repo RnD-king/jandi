@@ -318,6 +318,56 @@ void Dxl::SyncWriteRawPositions(
   }
 }
 
+void Dxl::SyncWritePositionPDGains(
+    const std::unordered_map<int, PositionPDGain>& gains)
+{
+  dynamixel::GroupSyncWrite d_writer(
+      portHandler, packetHandler, DxlReg_PositionDGain, 2);
+  dynamixel::GroupSyncWrite p_writer(
+      portHandler, packetHandler, DxlReg_PositionPGain, 2);
+
+  for (uint8_t i = 0; i < NUMBER_OF_DYNAMIXELS; ++i) {
+    const int motor_id = static_cast<int>(dxl_id[i]);
+    const auto gain = gains.find(motor_id);
+    if (gain == gains.end()) {
+      throw std::invalid_argument(
+          "PD gains are missing Dynamixel ID " + std::to_string(motor_id));
+    }
+    if (gain->second.p_gain > 16383 || gain->second.d_gain > 16383) {
+      throw std::invalid_argument(
+          "PD gain is outside 0..16383 for Dynamixel ID " +
+          std::to_string(motor_id));
+    }
+
+    uint8_t d_parameter[2] = {
+        DXL_LOBYTE(gain->second.d_gain), DXL_HIBYTE(gain->second.d_gain)};
+    uint8_t p_parameter[2] = {
+        DXL_LOBYTE(gain->second.p_gain), DXL_HIBYTE(gain->second.p_gain)};
+    if (!d_writer.addParam(dxl_id[i], d_parameter) ||
+        !p_writer.addParam(dxl_id[i], p_parameter)) {
+      throw std::runtime_error(
+          "PD GroupSyncWrite addParam failed for Dynamixel ID " +
+          std::to_string(motor_id));
+    }
+  }
+
+  int result = d_writer.txPacket();
+  d_writer.clearParam();
+  if (result != COMM_SUCCESS) {
+    p_writer.clearParam();
+    throw std::runtime_error(
+        std::string("D gain SyncWrite failed: ") +
+        packetHandler->getTxRxResult(result));
+  }
+  result = p_writer.txPacket();
+  p_writer.clearParam();
+  if (result != COMM_SUCCESS) {
+    throw std::runtime_error(
+        std::string("P gain SyncWrite failed: ") +
+        packetHandler->getTxRxResult(result));
+  }
+}
+
 
 
 
