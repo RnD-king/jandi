@@ -22,6 +22,43 @@ P2PMotionPlayer::Motion P2PMotionPlayer::LoadMotion(
     Motion motion;
     motion.name = root.get<std::string>("name", json_path.string());
 
+    std::vector<int> motor_ids;
+    if (const auto ids = root.get_child_optional("motor_ids")) {
+        for (const auto& entry : *ids) {
+            motor_ids.push_back(entry.second.get_value<int>());
+        }
+    }
+
+    if (const auto gains = root.get_child_optional("pd_gains")) {
+        const auto parse_gain = [&](const ptree& source,
+                                    const std::string& label) {
+            const int p_gain = source.get<int>("p_gain");
+            const int d_gain = source.get<int>("d_gain");
+            if (p_gain < 0 || p_gain > 16383 ||
+                d_gain < 0 || d_gain > 16383) {
+                throw std::runtime_error(
+                    "PD gain is outside 0..16383 at " + label);
+            }
+            return PositionPDGain{
+                static_cast<std::uint16_t>(p_gain),
+                static_cast<std::uint16_t>(d_gain)};
+        };
+
+        if (const auto default_gain = gains->get_child_optional("default")) {
+            const PositionPDGain value =
+                parse_gain(*default_gain, "pd_gains.default");
+            for (const int motor_id : motor_ids) {
+                motion.pd_gains[motor_id] = value;
+            }
+        }
+        for (const auto& entry : *gains) {
+            if (entry.first == "default") continue;
+            const int motor_id = std::stoi(entry.first);
+            motion.pd_gains[motor_id] =
+                parse_gain(entry.second, "pd_gains." + entry.first);
+        }
+    }
+
     const auto frames = root.get_child_optional("keyframes");
     if (!frames) {
         throw std::runtime_error(
@@ -128,6 +165,7 @@ void P2PMotionPlayer::ApplyStartOptions(
         Motion final_pose;
         final_pose.name = motions_.back().name + "_final_pose";
         final_pose.keyframes.push_back(motions_.back().keyframes.back());
+        final_pose.pd_gains = motions_.back().pd_gains;
         motions_.clear();
         motions_.push_back(std::move(final_pose));
     }
@@ -204,6 +242,9 @@ void P2PMotionPlayer::SelectMotion(std::size_t index)
     motion_name_ = motions_.at(index).name;
     keyframes_ = motions_.at(index).keyframes;
     keyframe_index_ = 0;
+    if (!motions_.at(index).pd_gains.empty()) {
+        dxl_->SyncWritePositionPDGains(motions_.at(index).pd_gains);
+    }
 }
 
 bool P2PMotionPlayer::Start(
@@ -246,6 +287,7 @@ bool P2PMotionPlayer::Start(
 
 void P2PMotionPlayer::BeginKeyframe(Clock::time_point now)
 {
+    constexpr double kControlHz = 50.0;
     const Keyframe& frame = keyframes_.at(keyframe_index_);
     double max_delta_deg = 0.0;
 
@@ -260,6 +302,12 @@ void P2PMotionPlayer::BeginKeyframe(Clock::time_point now)
     // 사용자가 지정한 시간보다 속도 제한에 필요한 시간이 길면 자동으로 늘린다.
     effective_duration_sec_ = std::max(
         frame.duration_sec, max_delta_deg / frame.max_speed_deg_s);
+    // P2P 사이트와 동일한 방식: duration * control_hz를 반올림하고
+    // 아주 짧은 모션도 최소 2개의 목표점을 순서대로 전송한다.
+    move_step_count_ = std::max<std::size_t>(
+        2, static_cast<std::size_t>(
+               std::llround(effective_duration_sec_ * kControlHz)));
+    move_step_ = 0;
     phase_started_at_ = now;
     holding_ = false;
 }
@@ -302,8 +350,11 @@ P2PMotionPlayer::UpdateResult P2PMotionPlayer::Update()
             return UpdateResult::kRunning;
         }
 
-        // 현재 구간 진행률과 interpolation 곡선의 비율 alpha를 계산한다.
-        const double progress = elapsed / effective_duration_sec_;
+        // 실제 경과시간으로 진행률을 뛰어넘지 않고 사이트처럼 매 timer마다
+        // 정확히 한 step씩 진행한다. timer 지연 시 전체 실행시간이 늘어난다.
+        ++move_step_;
+        const double progress = static_cast<double>(move_step_) /
+            static_cast<double>(move_step_count_);
         const double alpha = Interpolate(frame.interpolation, progress);
         RawPositions command;
 
@@ -317,7 +368,7 @@ P2PMotionPlayer::UpdateResult P2PMotionPlayer::Update()
         // 23개 목표를 하나의 GroupSyncWrite 패킷으로 동시에 전송한다.
         dxl_->SyncWriteRawPositions(command);
 
-        if (progress < 1.0) return UpdateResult::kRunning;
+        if (move_step_ < move_step_count_) return UpdateResult::kRunning;
         start_positions_ = frame.positions;
         // 이동이 끝났어도 hold가 있으면 아직 전체 keyframe 완료가 아니다.
         if (frame.hold_sec > 0.0) {
@@ -351,4 +402,6 @@ void P2PMotionPlayer::Stop()
     motion_index_ = 0;
     keyframe_index_ = 0;
     effective_duration_sec_ = 0.0;
+    move_step_ = 0;
+    move_step_count_ = 0;
 }
