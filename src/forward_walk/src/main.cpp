@@ -232,7 +232,7 @@ private:
     int CalculateTurnCount(int target_yaw_deg) const
     {
         const int requested = static_cast<int>(std::lround(
-            std::abs(target_yaw_deg) / turn_step_deg_));
+            target_yaw_deg / turn_step_deg_));
         return std::clamp(requested, 0, max_turn_repetitions_);
     }
 
@@ -302,20 +302,8 @@ private:
         P2PMotionPlayer::StartOptions start_options;
 
         if (IsTurnAction(message->action)) {
-            const bool wrong_left_sign =
-                IsLeftTurnAction(message->action) &&
-                requested_target_yaw_deg < 0;
-            const bool wrong_right_sign =
-                IsRightTurnAction(message->action) &&
-                requested_target_yaw_deg > 0;
-            if (wrong_left_sign || wrong_right_sign) {
-                RCLCPP_ERROR(
-                    get_logger(),
-                    "Turn action direction disagrees with target_yaw_deg=%d",
-                    requested_target_yaw_deg);
-                return;
-            }
-
+            // 회전 방향은 TURN_LEFT/TURN_RIGHT action으로만 정한다.
+            // Vision이 전달한 양수 회전량은 별도 부호 변환 없이 그대로 사용한다.
             const int turn_count =
                 CalculateTurnCount(requested_target_yaw_deg);
             if (turn_count == 0 &&
@@ -333,7 +321,7 @@ private:
             }
 
             start_options.repeat_count = static_cast<std::size_t>(turn_count);
-            const int direction = requested_target_yaw_deg > 0 ? 1 : -1;
+            const int direction = IsLeftTurnAction(message->action) ? 1 : -1;
             effective_target_yaw_deg = static_cast<int>(std::lround(
                 direction * turn_count * turn_step_deg_));
             RCLCPP_INFO(
