@@ -2,6 +2,7 @@
 #define DYNAMIXEL_H
 
 #include <eigen3/Eigen/Dense>
+#include <cstdint>
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -32,6 +33,12 @@
 
 
 using Eigen::VectorXd;
+
+struct PositionPDGain
+{
+    std::uint16_t p_gain{850};
+    std::uint16_t d_gain{0};
+};
 
 // Operating Mode
 enum DynamixelOperatingMode
@@ -212,6 +219,8 @@ class Dxl
         virtual std::unordered_map<int, int32_t> GetRawPositions();
         virtual void SyncWriteRawPositions(
             const std::unordered_map<int, int32_t>& raw_positions);
+        virtual void SyncWritePositionPDGains(
+            const std::unordered_map<int, PositionPDGain>& gains);
         void SetPIDGain(VectorXd PID_Gain);
 
 
