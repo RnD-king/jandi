@@ -32,7 +32,7 @@ public:
         // 2) ProgramFileForAction()으로 action → JSON 파일명 변환
         // 3) P2PMotionPlayer::Start()가 JSON과 현재 encoder 위치를 준비
         // 4) 준비 성공 후 같은 action_id로 ACK publish
-        // 5) 10 ms MotionLoop에서 Update()를 반복해 raw tick 전송
+        // 5) 20 ms MotionLoop에서 Update()를 반복해 raw tick 전송
         // 6) 마지막 keyframe/hold 완료 후 같은 action_id로 DONE publish
 
         // motions/와 missions/를 포함한 패키지 share 루트다.
@@ -79,9 +79,9 @@ public:
         camera_status_pub_ = create_publisher<vision::msg::CommandStatus>(
             "/jandi_vision/camera_status", 10);
 
-        // JSON 보간과 전송을 callback에서 block하지 않고 100 Hz로 수행한다.
+        // JSON 보간과 전송을 callback에서 block하지 않고 50 Hz로 수행한다.
         motion_loop_timer_ = create_wall_timer(
-            10ms, std::bind(&MainNode::MotionLoop, this));
+            20ms, std::bind(&MainNode::MotionLoop, this));
         motion_loop_timer_->cancel();
 
         // WALK_MODE 마지막 자세에 도착하기 전에는 명령 topic을 구독하지 않는다.
@@ -414,7 +414,7 @@ private:
         // Update() 안에서 JSON 보간과 raw tick GroupSyncWrite가 한 번 수행된다.
         const auto result = p2p_player_->Update();
         if (result == P2PMotionPlayer::UpdateResult::kRunning) {
-            LogLegJointTorqueStep();
+            // LogLegJointTorqueStep();
             return;
         }
         if (result == P2PMotionPlayer::UpdateResult::kError) {
