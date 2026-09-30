@@ -14,7 +14,7 @@
 class P2PMotionPlayer
 {
 public:
-    // main.cpp의 100 Hz 타이머가 Update() 결과를 보고 다음 처리를 결정한다.
+    // main.cpp의 50 Hz 타이머가 Update() 결과를 보고 다음 처리를 결정한다.
     // kFinished일 때만 해당 ActionCommand에 대한 DONE을 보내야 한다.
     enum class UpdateResult { kIdle, kRunning, kFinished, kError };
 
@@ -37,8 +37,8 @@ public:
                const std::string& motion_directory,
                const StartOptions& options);
 
-    // ROS timer에서 주기적으로 호출한다. 현재 시각을 기준으로 목표 raw tick을
-    // 한 번 계산하고 Dynamixel에 한 번 전송하므로 ROS callback을 오래 막지 않는다.
+    // ROS timer에서 주기적으로 호출한다. P2P 사이트와 동일하게 매 호출마다
+    // 고정된 한 step을 계산해 전송하며, timer가 늦어져도 중간 step을 건너뛰지 않는다.
     UpdateResult Update();
 
     // 재생 상태만 정지/초기화한다. Torque OFF 명령은 수행하지 않는다.
@@ -69,6 +69,7 @@ private:
     struct Motion {
         std::string name;
         std::vector<Keyframe> keyframes;
+        std::unordered_map<int, PositionPDGain> pd_gains;
     };
 
     using Clock = std::chrono::steady_clock;
@@ -94,6 +95,8 @@ private:
     RawPositions start_positions_;       // 현재 구간을 시작한 실제/직전 목표 위치
     std::size_t keyframe_index_{0};       // 지금 실행 중인 JSON keyframe 번호
     double effective_duration_sec_{0.0};
+    std::size_t move_step_{0};             // 현재 keyframe에서 전송 완료한 고정 step 수
+    std::size_t move_step_count_{0};       // duration * 50 Hz로 계산한 전체 step 수
     Clock::time_point phase_started_at_{}; // 이동 또는 hold를 시작한 시각
     bool holding_{false};                  // false=이동 중, true=hold 중
     bool playing_{false};                  // 전체 모션 재생 여부
